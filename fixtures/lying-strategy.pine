@@ -1,0 +1,57 @@
+//@version=6
+// Deliberately broken fixture. Every violation here is intentional.
+// This is the shape of a strategy that shows a 4,000% backtest and loses money live.
+strategy("Momentum Crusher 9000",
+     overlay              = true,
+     calc_on_every_tick   = true,
+     default_qty_type     = strategy.percent_of_equity,
+     default_qty_value    = 100,
+     pyramiding           = 4,
+     process_orders_on_close = true)
+
+fastLen    = input.int(9,   "Fast MA")
+slowLen    = input.int(21,  "Slow MA")
+rsiLen     = input.int(14,  "RSI Length")
+rsiBuy     = input.int(30,  "RSI Buy")
+rsiSell    = input.int(70,  "RSI Sell")
+atrLen     = input.int(14,  "ATR Length")
+atrMult    = input.float(2.0, "ATR Multiplier")
+volFilter  = input.float(1.5, "Volume Multiple")
+
+startDate = timestamp(2021, 3, 1, 0, 0)
+endDate   = timestamp(2024, 11, 15, 0, 0)
+inWindow  = time >= startDate and time <= endDate
+
+// Reads tomorrow's daily high on every historical bar.
+dailyHigh = request.security(syminfo.tickerid, "D", high, lookahead = barmerge.lookahead_on)
+
+// Unconfirmed higher-timeframe close: repaints live, not in backtest.
+weeklyClose = request.security(syminfo.tickerid, "W", close)
+
+haClose = request.security(ticker.heikinashi(syminfo.tickerid), timeframe.period, close)
+
+varip int ticksSeen = 0
+if barstate.isnew
+    ticksSeen := 0
+ticksSeen += 1
+
+fastMa = ta.ema(close, fastLen)
+slowMa = ta.ema(close, slowLen)
+rsi    = ta.rsi(close, rsiLen)
+
+longSignal  = ta.crossover(fastMa, slowMa) and rsi < rsiSell and close > weeklyClose and inWindow
+shortSignal = ta.crossunder(fastMa, slowMa) and rsi > rsiBuy and haClose < weeklyClose and inWindow
+
+if longSignal
+    strategy.entry("Long", strategy.long, limit = close * 0.999)
+
+if shortSignal
+    strategy.entry("Short", strategy.short)
+
+// No stop, no limit, no trail — this call does nothing at all.
+strategy.exit("ExitLong", from_entry = "Long")
+
+// "LongEntry" was never declared; this stop does not exist.
+strategy.exit("Protect", from_entry = "LongEntry", stop = close - ta.atr(atrLen) * atrMult)
+
+plot(dailyHigh, "Tomorrow's high", color.new(color.red, 0))

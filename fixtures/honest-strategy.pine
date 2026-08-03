@@ -1,0 +1,39 @@
+//@version=6
+// Control fixture: same idea, modelled honestly. Should produce no high-severity findings.
+strategy("EMA Cross — costed",
+     overlay             = true,
+     initial_capital     = 25000,
+     default_qty_type    = strategy.percent_of_equity,
+     default_qty_value   = 10,
+     commission_type     = strategy.commission.percent,
+     commission_value    = 0.03,
+     slippage            = 2,
+     margin_long         = 50,
+     margin_short        = 50,
+     use_bar_magnifier   = true,
+     pyramiding          = 1)
+
+fastLen = input.int(12, "Fast MA")
+slowLen = input.int(26, "Slow MA")
+atrMult = input.float(2.5, "Stop ATR multiple")
+
+// Offset by [1] and lookahead_on together: the confirmed prior daily close, no leak.
+dailyClose = request.security(syminfo.tickerid, "D", close[1], lookahead = barmerge.lookahead_on)
+
+fastMa = ta.ema(close, fastLen)
+slowMa = ta.ema(close, slowLen)
+atr    = ta.atr(14)
+
+longSignal = ta.crossover(fastMa, slowMa) and close > dailyClose and barstate.isconfirmed
+
+if longSignal
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long stop", from_entry = "Long", stop = close - atr * atrMult, trail_points = atr, trail_offset = atr * 0.5)
+
+if ta.crossunder(fastMa, slowMa) and barstate.isconfirmed
+    strategy.close("Long")
+
+strategy.risk.max_intraday_loss(5, strategy.percent_of_equity)
+
+plot(fastMa, "Fast", color.new(color.teal, 0))
+plot(slowMa, "Slow", color.new(color.orange, 0))

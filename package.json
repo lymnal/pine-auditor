@@ -1,0 +1,24 @@
+{
+  "name": "pine-auditor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Static backtest-integrity audit for TradingView Pine Script strategies",
+  "type": "module",
+  "bin": {
+    "pine-audit": "./src/index.ts"
+  },
+  "scripts": {
+    "audit": "node src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/rules.test.ts",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
+  },
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "prettier": "^3.4.0",
+    "typescript": "^5.7.0"
+  }
+}
