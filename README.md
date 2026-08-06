@@ -1,5 +1,8 @@
 # pine-auditor
 
+[![ci](https://github.com/lymnal/pine-auditor/actions/workflows/ci.yml/badge.svg)](https://github.com/lymnal/pine-auditor/actions/workflows/ci.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Static backtest-integrity audit for TradingView Pine Script strategies.
 
 TradingView's Strategy Tester will happily report a 4,000% return on a strategy that trades on data from the future, fills at prices that never existed, and pays no commission. This finds those defects before they cost you money.
@@ -23,6 +26,40 @@ node src/index.ts strategy.pine --format markdown --min high
 | `--fail-on` | severity, or `never` | `high` |
 
 Exits 1 when anything at or above `--fail-on` fires — usable as a pre-commit gate.
+
+## What a report looks like
+
+Every finding carries three things: the evidence it saw, the mechanism by which that inflates the backtest, and what to do instead. A finding without all three is a bug.
+
+```
+$ node src/index.ts fixtures/lying-strategy.pine
+
+ CRITICAL  PA001 lookahead_on without a historical offset leaks future data  (line 26)
+      request.security(syminfo.tickerid, "D", high, lookahead = barmerge.lookahead_on)
+      On historical bars this returns the higher-timeframe value before it could have been
+      known. The equity curve is fiction — it trades on data from the future. TradingView
+      prohibits this pattern in published scripts.
+      Fix: lookahead_on is only safe paired with an offset: request.security(sym, tf,
+      expr[1], lookahead = barmerge.lookahead_on). The two are interdependent; neither works
+      alone.
+
+ HIGH  PA030 Full-equity compounding produces an unachievable curve  (line 4)
+      default_qty_type = strategy.percent_of_equity, default_qty_value = 100
+      Every trade risks the entire account, so a good run compounds into a vertical line
+      that hides the drawdown underneath it. It also assumes fractional fills and instant
+      reinvestment that no broker provides.
+      Fix: Size on a fixed fraction of equity you would actually risk, then judge the
+      strategy on max drawdown and profit factor rather than net profit.
+
+23 finding(s): 3 critical, 11 high, 7 medium, 2 low
+```
+
+The companion fixture is the other half of the contract:
+
+```
+$ node src/index.ts fixtures/honest-strategy.pine
+PASS fixtures/honest-strategy.pine — no deterministic backtest-integrity issues found.
+```
 
 ## Rules
 
